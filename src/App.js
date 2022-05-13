@@ -10,9 +10,9 @@ const generateFakeData = () => {
   return data;
 };
 
-const getData = (data, page) => {
+const getData = (data, page, threshold) => {
   if (page >= 0) {
-    return data.slice(page * 10, (page + 1) * 10);
+    return data.slice(page * 10, (page + 1) * 10 + threshold);
   }
 };
 
@@ -25,22 +25,18 @@ export default function App() {
   const [loadedBlocks, setLoadedBlocks] = useState([]);
   const topItemObserver = useRef();
   const bottomItemObserver = useRef();
-
   const [fakeData, setFakeData] = useState(generateFakeData());
 
   const addBlockInBack = React.useCallback(
     (block) => {
-      setLoadedBlocks((prevBlocks) => {
-        const blocks = prevBlocks;
-        blocks[0] = prevBlocks.length === 2 ? prevBlocks[1] : undefined;
-        blocks[1] = block;
-        return blocks;
-      });
+      const newData = [];
+      newData[0] = loadedBlocks.length === 2 ? loadedBlocks[1] : undefined;
+      newData[1] = block;
+      setLoadedBlocks(newData);
     },
     [loadedBlocks]
   );
 
-  console.log(loadedBlocks);
   const addBlockInFront = React.useCallback(
     (block) => {
       setLoadedBlocks((prevBlocks) => {
@@ -71,7 +67,7 @@ export default function App() {
     if (increasedPageNumber) {
       addBlockInBack(getData(fakeData, pageNumber));
     } else {
-      addBlockInFront(getData(fakeData, pageNumber));
+      addBlockInFront(getData(fakeData, pageNumber, -3));
     }
     setLoading(false);
   }, [pageNumber]);
@@ -81,12 +77,12 @@ export default function App() {
       if (loading) return;
       if (topItemObserver.current) topItemObserver.current.disconnect();
       topItemObserver.current = new IntersectionObserver((entries) => {
-        if (!entries[0].isIntersecting) {
+        if (entries[0].isIntersecting) {
           decreasePageNumber();
-          console.log("Penultim item intersected");
         }
       });
       if (node) topItemObserver.current.observe(node);
+      if (node) node.scrollIntoView();
     },
     [decreasePageNumber, loading]
   );
@@ -96,9 +92,8 @@ export default function App() {
       if (loading) return;
       if (bottomItemObserver.current) bottomItemObserver.current.disconnect();
       bottomItemObserver.current = new IntersectionObserver((entries) => {
-        if (entries[0].isIntersecting && hasMore) {
+        if (entries[0].isIntersecting && true) {
           increasePageNumber();
-          console.log("Ultim item intersected");
         }
       });
       if (node) bottomItemObserver.current.observe(node);
@@ -106,35 +101,41 @@ export default function App() {
     [increasePageNumber, loading, hasMore]
   );
 
-  const firstBlock = loadedBlocks[0];
-  const secondBlock = loadedBlocks[1];
-
-  console.log(firstBlock);
-  console.log(secondBlock);
-
   return (
     <>
       <div>
         <div>{loading && "Loading..."}</div>
         <div>{error && "Error"}</div>
-        {firstBlock &&
-          firstBlock.map((item, index) => {
-            if (firstBlock.length === index + 1) {
-              return <div style={{ height: "120px" }}>{item}</div>;
-            } else {
-              return <div style={{ height: "120px" }}>{item}</div>;
-            }
-          })}
-        {secondBlock &&
-          secondBlock.map((item, index) => {
-            if (secondBlock.length === index + 1) {
+        {loadedBlocks[0] &&
+          loadedBlocks[0].map((item, index) => {
+            if (0 === index) {
               return (
-                <div ref={bottomItemRef} style={{ height: "130px" }}>
+                <div key={item} ref={topItemRef} style={{ height: "120px" }}>
                   {item}
                 </div>
               );
             } else {
-              return <div style={{ height: "130px" }}>{item}</div>;
+              return (
+                <div key={item} style={{ height: "120px" }}>
+                  {item}
+                </div>
+              );
+            }
+          })}
+        {loadedBlocks[1] &&
+          loadedBlocks[1].map((item, index) => {
+            if (loadedBlocks[1].length === index + 1) {
+              return (
+                <div key={item} ref={bottomItemRef} style={{ height: "130px" }}>
+                  {item}
+                </div>
+              );
+            } else {
+              return (
+                <div key={item} style={{ height: "130px" }}>
+                  {item}
+                </div>
+              );
             }
           })}
         <div>{loading && "Loading..."}</div>
