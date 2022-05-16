@@ -4,15 +4,15 @@ import React, { useEffect, useState, useRef, useCallback } from "react";
 
 const generateFakeData = () => {
   const data = [];
-  for (let i = 0; i < 1000; i++) {
+  for (let i = 0; i < 100; i++) {
     data.push(`title ${i}`);
   }
   return data;
 };
 
-const getData = (data, page, threshold) => {
+const getData = (data, page, threshold = 0) => {
   if (page >= 0) {
-    return data.slice(page * 10, (page + 1) * 10 + threshold);
+    return data.slice(page * 10 + threshold, (page + 1) * 10);
   }
 };
 
@@ -55,7 +55,7 @@ export default function App() {
   }, []);
 
   const decreasePageNumber = React.useCallback(() => {
-    setPageNumber((prevPageNumber) => prevPageNumber - 1);
+    setPageNumber((prevPageNumber) => Math.max(prevPageNumber - 1, 0));
     setIncreasedPageNumber(false);
   }, []);
 
@@ -67,10 +67,10 @@ export default function App() {
     if (increasedPageNumber) {
       addBlockInBack(getData(fakeData, pageNumber));
     } else {
-      addBlockInFront(getData(fakeData, pageNumber, -3));
+      addBlockInFront(getData(fakeData, pageNumber));
     }
     setLoading(false);
-  }, [pageNumber]);
+  }, [increasedPageNumber, pageNumber]);
 
   const topItemRef = useCallback(
     (node) => {
@@ -78,14 +78,29 @@ export default function App() {
       if (topItemObserver.current) topItemObserver.current.disconnect();
       topItemObserver.current = new IntersectionObserver((entries) => {
         if (entries[0].isIntersecting) {
+          console.log("Intersected top");
           decreasePageNumber();
         }
       });
       if (node) topItemObserver.current.observe(node);
-      if (node) node.scrollIntoView();
     },
     [decreasePageNumber, loading]
   );
+
+  const scrollPointTop = useCallback((node) => {
+    if (node) {
+      console.log("Scrolling top");
+      node.scrollIntoView();
+    }
+  }, []);
+
+  const scrollPointBottom = useCallback((node) => {
+    if (node) {
+      console.log(node);
+      console.log("Scrolling bottom");
+      node.scrollIntoView();
+    }
+  }, []);
 
   const bottomItemRef = useCallback(
     (node) => {
@@ -94,6 +109,7 @@ export default function App() {
       bottomItemObserver.current = new IntersectionObserver((entries) => {
         if (entries[0].isIntersecting && true) {
           increasePageNumber();
+          console.log("Intersected bottom");
         }
       });
       if (node) bottomItemObserver.current.observe(node);
@@ -127,6 +143,16 @@ export default function App() {
             if (loadedBlocks[1].length === index + 1) {
               return (
                 <div key={item} ref={bottomItemRef} style={{ height: "130px" }}>
+                  {item}
+                </div>
+              );
+            } else if (index === 0) {
+              return (
+                <div
+                  key={item}
+                  ref={scrollPointBottom}
+                  style={{ height: "130px" }}
+                >
                   {item}
                 </div>
               );
