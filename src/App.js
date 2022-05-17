@@ -2,7 +2,9 @@
 
 import React, { useEffect, useState, useRef, useCallback } from "react";
 
-const generateFakeData = () => {
+const PAGE_SIZE = 10;
+
+const generatevirtualizedData = () => {
   const data = [];
   for (let i = 0; i < 100; i++) {
     data.push(`title ${i}`);
@@ -10,147 +12,145 @@ const generateFakeData = () => {
   return data;
 };
 
-const getData = (data, page, threshold = 0) => {
+const getData = (data, page, pageSize = PAGE_SIZE, threshold = 0) => {
   if (page >= 0) {
-    return data.slice(page * 10 + threshold, (page + 1) * 10);
+    return data.slice(
+      Math.max(page - 1, 0) * 10,
+      Math.min(page + 1, PAGE_SIZE) * 10
+    );
   }
 };
 
 export default function App() {
+  const [prevPageNumber, setPrevPageNumber] = useState(0);
   const [pageNumber, setPageNumber] = useState(0);
-  const [increasedPageNumber, setIncreasedPageNumber] = useState(true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [hasMore, setHasMore] = useState(false);
-  const [loadedBlocks, setLoadedBlocks] = useState([]);
+  const [loadedBlock, setLoadedBlock] = useState([]);
+  const [scrollHeight, setScrollHeight] = useState(0);
   const topItemObserver = useRef();
   const bottomItemObserver = useRef();
-  const [fakeData, setFakeData] = useState(generateFakeData());
-
-  const addBlockInBack = React.useCallback(
-    (block) => {
-      const newData = [];
-      newData[0] = loadedBlocks.length === 2 ? loadedBlocks[1] : undefined;
-      newData[1] = block;
-      setLoadedBlocks(newData);
-    },
-    [loadedBlocks]
-  );
-
-  const addBlockInFront = React.useCallback(
-    (block) => {
-      setLoadedBlocks((prevBlocks) => {
-        const blocks = prevBlocks;
-        blocks[1] = prevBlocks[0];
-        blocks[0] = block;
-        return blocks;
-      });
-    },
-    [loadedBlocks]
+  const bottomWaypoint = useRef();
+  const topWaypoint = useRef();
+  const container = useRef();
+  const [virtualizedData, setvirtualizedData] = useState(
+    generatevirtualizedData()
   );
 
   const increasePageNumber = React.useCallback(() => {
-    setPageNumber((prevPageNumber) => prevPageNumber + 1);
-    setIncreasedPageNumber(true);
-  }, []);
+    setPrevPageNumber(pageNumber);
+    setPageNumber((prevPageNumber) =>
+      Math.min(
+        prevPageNumber + 1,
+        Math.max(Math.floor(virtualizedData.length / PAGE_SIZE) - 1, 0)
+      )
+    );
+  }, [pageNumber]);
 
   const decreasePageNumber = React.useCallback(() => {
+    setPrevPageNumber(pageNumber);
     setPageNumber((prevPageNumber) => Math.max(prevPageNumber - 1, 0));
-    setIncreasedPageNumber(false);
-  }, []);
+  }, [pageNumber]);
 
   useEffect(() => {
     setLoading(true);
     setError(false);
     setHasMore(true);
 
-    if (increasedPageNumber) {
-      addBlockInBack(getData(fakeData, pageNumber));
-    } else {
-      addBlockInFront(getData(fakeData, pageNumber));
-    }
+    setLoadedBlock(getData(virtualizedData, pageNumber));
+
     setLoading(false);
-  }, [increasedPageNumber, pageNumber]);
+  }, [pageNumber]);
 
   const topItemRef = useCallback(
     (node) => {
       if (loading) return;
       if (topItemObserver.current) topItemObserver.current.disconnect();
-      topItemObserver.current = new IntersectionObserver((entries) => {
-        if (entries[0].isIntersecting) {
-          console.log("Intersected top");
-          decreasePageNumber();
-        }
-      });
+      container.current.scrollTop = scrollHeight;
+      topItemObserver.current = new IntersectionObserver(
+        (entries) => {
+          if (entries[0].isIntersecting) {
+            setScrollHeight(topWaypoint.current.scrollHeight);
+            decreasePageNumber();
+          }
+        },
+        { rootMargin: "-100px" }
+      );
       if (node) topItemObserver.current.observe(node);
     },
     [decreasePageNumber, loading]
   );
 
-  const scrollPointTop = useCallback((node) => {
-    if (node) {
-      console.log("Scrolling top");
-      node.scrollIntoView();
-    }
-  }, []);
-
-  const scrollPointBottom = useCallback((node) => {
-    if (node) {
-      console.log(node);
-      console.log("Scrolling bottom");
-      node.scrollIntoView();
-    }
-  }, []);
-
   const bottomItemRef = useCallback(
     (node) => {
       if (loading) return;
       if (bottomItemObserver.current) bottomItemObserver.current.disconnect();
-      bottomItemObserver.current = new IntersectionObserver((entries) => {
-        if (entries[0].isIntersecting && true) {
-          increasePageNumber();
-          console.log("Intersected bottom");
-        }
-      });
+      container.current.scrollTop = scrollHeight;
+      bottomItemObserver.current = new IntersectionObserver(
+        (entries) => {
+          if (entries[0].isIntersecting && true) {
+            setScrollHeight(bottomWaypoint.current.scrollHeight);
+            increasePageNumber();
+          }
+        },
+        { rootMargin: "-100px" }
+      );
       if (node) bottomItemObserver.current.observe(node);
     },
     [increasePageNumber, loading, hasMore]
   );
 
+  console.log(loadedBlock);
+
   return (
     <>
-      <div>
+      <div
+        id="parent"
+        ref={container}
+        style={{ height: "100vh", overflow: "scroll" }}
+      >
         <div>{loading && "Loading..."}</div>
         <div>{error && "Error"}</div>
-        {loadedBlocks[0] &&
-          loadedBlocks[0].map((item, index) => {
-            if (0 === index) {
-              return (
-                <div key={item} ref={topItemRef} style={{ height: "120px" }}>
-                  {item}
-                </div>
-              );
-            } else {
-              return (
-                <div key={item} style={{ height: "120px" }}>
-                  {item}
-                </div>
-              );
-            }
-          })}
-        {loadedBlocks[1] &&
-          loadedBlocks[1].map((item, index) => {
-            if (loadedBlocks[1].length === index + 1) {
-              return (
-                <div key={item} ref={bottomItemRef} style={{ height: "130px" }}>
-                  {item}
-                </div>
-              );
-            } else if (index === 0) {
+        {loadedBlock &&
+          loadedBlock.map((item, index) => {
+            if (index === 0) {
               return (
                 <div
-                  key={item}
-                  ref={scrollPointBottom}
+                  key={item + index}
+                  ref={topItemRef}
+                  style={{ height: "130px" }}
+                >
+                  {item}
+                </div>
+              );
+            } else if (index === 2) {
+              return (
+                <div
+                  id="scrollPointStart"
+                  key={item + index}
+                  ref={topWaypoint}
+                  style={{ height: "130px" }}
+                >
+                  {item}
+                </div>
+              );
+            } else if (index + 2 === loadedBlock.length) {
+              return (
+                <div
+                  id="scrollPointEnd"
+                  key={item + index}
+                  ref={bottomWaypoint}
+                  style={{ height: "130px" }}
+                >
+                  {item}
+                </div>
+              );
+            } else if (index === loadedBlock.length - 1) {
+              return (
+                <div
+                  key={item + index}
+                  ref={bottomItemRef}
                   style={{ height: "130px" }}
                 >
                   {item}
@@ -158,7 +158,7 @@ export default function App() {
               );
             } else {
               return (
-                <div key={item} style={{ height: "130px" }}>
+                <div key={item + index} style={{ height: "130px" }}>
                   {item}
                 </div>
               );
